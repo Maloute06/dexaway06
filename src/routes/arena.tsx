@@ -32,6 +32,15 @@ const FAKE = [
   "OneTapOscar", "SmurfSteph", "AfkAntoine", "PogFrog", "BoumBoum", "LuckyLuz",
 ];
 
+/** Génère un nombre illimité de viewers de test (pas de plafond). */
+function makeTestViewers(offset: number, count: number) {
+  return Array.from({ length: count }, (_, i) => {
+    const n = offset + i;
+    const base = FAKE[n % FAKE.length]!;
+    return n < FAKE.length ? base : `${base}${Math.floor(n / FAKE.length) + 1}`;
+  });
+}
+
 function Arena() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [channelInput, setChannelInput] = useState("");
@@ -180,10 +189,10 @@ function Arena() {
               <button
                 className="btn-ghost"
                 onClick={() =>
-                  setParticipants((prev) => {
-                    const pool = FAKE.filter((f) => !prev.includes(f));
-                    return [...prev, ...pool.slice(0, 8)];
-                  })
+                  setParticipants((prev) => [
+                    ...prev,
+                    ...makeTestViewers(prev.length, 12).filter((n) => !prev.includes(n)),
+                  ])
                 }
               >
                 Ajouter des viewers de test

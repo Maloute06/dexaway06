@@ -98,7 +98,7 @@ function Landing() {
                 <p className="mt-2 text-sm text-muted-foreground">{g.description}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="tag">
-                    👥 {g.playersMin}–{g.playersMax}
+                    👥 {g.playersMin}+ · illimité
                   </span>
                   <span className="tag">
                     ⏱ {g.durationMin}–{g.durationMax} s
