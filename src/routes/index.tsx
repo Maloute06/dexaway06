@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { MINI_GAMES } from "@/components/games/registry";
+import { GAME_IMAGES } from "@/components/games/images";
 
 export const Route = createFileRoute("/")({
   head: () => ({
