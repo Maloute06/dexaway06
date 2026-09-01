@@ -144,7 +144,7 @@ function Marble({ state, leader }: { state: Marble3DState; leader: boolean }) {
       const push = 1 + d * 5;
       g.position.set(vec.x * push, vec.y + d * 2 - d * d * 6.5, vec.z * push);
     } else {
-      g.position.set(vec.x + wobble * 0.3, vec.y + wobble * 0.1, vec.z + wobble * 0.3);
+      g.position.set(vec.x + wobble * 0.32, vec.y + 0.3 + wobble * 0.05, vec.z + wobble * 0.32);
     }
     g.rotation.x += 0.14;
     g.rotation.y += 0.09;
@@ -198,7 +198,7 @@ export default function MarbleDrop3D({
     >
       <color attach="background" args={["#0b0716"]} />
       <fog attach="fog" args={["#0b0716", 14, 32]} />
-      <ambientLight intensity={0.5} />
+      <ambientLight intensity={0.85} />
       <directionalLight position={[6, 10, 6]} intensity={1.3} castShadow />
       <pointLight position={[-6, 2, -4]} color="#8a3ffb" intensity={30} distance={22} />
       <Environment>
