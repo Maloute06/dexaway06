@@ -139,7 +139,7 @@ export default function MarbleDrop3D({
   leader,
 }: {
   marbles: Marble3DState[];
-  leader?: string;
+  leader?: string | undefined;
 }) {
   return (
     <Canvas
