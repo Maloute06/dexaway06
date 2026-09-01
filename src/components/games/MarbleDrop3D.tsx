@@ -70,7 +70,7 @@ function Track() {
     <group>
       <mesh geometry={floor} receiveShadow>
         <meshStandardMaterial
-          color="#8f6fd0"
+          color="#ff0000"
           emissive="#3a1f66"
           emissiveIntensity={0.8}
           metalness={0.2}
