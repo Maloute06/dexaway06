@@ -194,6 +194,7 @@ export default function MarbleDrop3D({
 }) {
   return (
     <Canvas
+      flat
       shadows
       dpr={[1, 1.75]}
       camera={{ position: [0, 4, 12], fov: 52 }}
