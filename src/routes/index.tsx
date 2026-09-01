@@ -81,16 +81,29 @@ function Landing() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MINI_GAMES.map((g) => (
             <article key={g.id} className="panel flex gap-4 p-5">
-              <span className="animate-float text-4xl">{g.emoji}</span>
+              <img
+                src={GAME_IMAGES[g.id]}
+                alt={`Logo du mini-jeu ${g.name}`}
+                loading="lazy"
+                width={128}
+                height={128}
+                className="h-16 w-16 shrink-0 rounded-xl border border-border object-cover shadow-lg"
+              />
               <div>
                 <h3 className="text-2xl">{g.name}</h3>
                 <p className="font-mono text-xs uppercase tracking-widest text-primary">
                   {g.tagline}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">{g.description}</p>
-                <p className="mt-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                  👥 {g.playersMin}–{g.playersMax} · ⏱ {g.durationMin}–{g.durationMax} s · {g.kind}
-                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="tag">
+                    👥 {g.playersMin}–{g.playersMax}
+                  </span>
+                  <span className="tag">
+                    ⏱ {g.durationMin}–{g.durationMax} s
+                  </span>
+                  <span className="tag">{g.kind}</span>
+                </div>
               </div>
             </article>
           ))}
