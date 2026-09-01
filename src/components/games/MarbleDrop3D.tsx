@@ -40,9 +40,7 @@ function Track() {
           color="#2a1d3d"
           metalness={0.65}
           roughness={0.28}
-          side={THREE.DoubleSide}
-          transparent
-          opacity={0.55}
+          side={THREE.BackSide}
         />
       </mesh>
       <mesh geometry={rail}>
@@ -109,7 +107,7 @@ function Marble({ state, leader }: { state: Marble3DState; leader: boolean }) {
         <meshStandardMaterial
           color={state.dead ? "#4b4b55" : color}
           emissive={state.dead ? "#000000" : color}
-          emissiveIntensity={state.dead ? 0 : leader ? 1.4 : 0.7}
+          emissiveIntensity={state.dead ? 0 : leader ? 2.2 : 1.35}
           metalness={0.4}
           roughness={0.12}
         />
