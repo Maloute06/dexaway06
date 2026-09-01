@@ -24,31 +24,81 @@ function helix(p: number, out = new THREE.Vector3()) {
   return out.set(Math.cos(a) * r, TOP_Y + (BOTTOM_Y - TOP_Y) * p, Math.sin(a) * r);
 }
 
+/** Rampe hélicoïdale ouverte (ruban) + rebord extérieur : les billes restent visibles. */
+function ramp(width: number, wallHeight: number) {
+  const SEG = 420;
+  const floor: number[] = [];
+  const wall: number[] = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const radial = new THREE.Vector3();
+  for (let i = 0; i < SEG; i++) {
+    helix(i / SEG, a);
+    helix((i + 1) / SEG, b);
+    const quad = (p: THREE.Vector3, dy: number) => {
+      radial.set(p.x, 0, p.z).normalize();
+      return [
+        p.x - radial.x * width * 0.5,
+        p.y + dy,
+        p.z - radial.z * width * 0.5,
+        p.x + radial.x * width * 0.5,
+        p.y + dy,
+        p.z + radial.z * width * 0.5,
+      ];
+    };
+    const [ai0, ai1, ai2, ao0, ao1, ao2] = quad(a, 0) as number[];
+    const [bi0, bi1, bi2, bo0, bo1, bo2] = quad(b, 0) as number[];
+    floor.push(ai0!, ai1!, ai2!, ao0!, ao1!, ao2!, bo0!, bo1!, bo2!);
+    floor.push(ai0!, ai1!, ai2!, bo0!, bo1!, bo2!, bi0!, bi1!, bi2!);
+    // rebord extérieur
+    wall.push(ao0!, ao1!, ao2!, ao0!, ao1! + wallHeight, ao2!, bo0!, bo1! + wallHeight, bo2!);
+    wall.push(ao0!, ao1!, ao2!, bo0!, bo1! + wallHeight, bo2!, bo0!, bo1!, bo2!);
+  }
+  const make = (arr: number[]) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
+    g.computeVertexNormals();
+    return g;
+  };
+  return { floor: make(floor), wall: make(wall) };
+}
+
+function Track() {
+  const { floor, wall } = useMemo(() => ramp(1.5, 0.42), []);
+  const edge = useMemo(() => new THREE.TubeGeometry(helixCurve(), 420, 0.05, 6, false), []);
+  return (
+    <group>
+      <mesh geometry={floor} receiveShadow>
+        <meshStandardMaterial
+          color="#5a3f86"
+          metalness={0.35}
+          roughness={0.35}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <mesh geometry={wall}>
+        <meshStandardMaterial
+          color="#8a4dd6"
+          emissive="#b06bff"
+          emissiveIntensity={0.6}
+          transparent
+          opacity={0.55}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <mesh geometry={edge}>
+        <meshBasicMaterial color="#e6b3ff" />
+      </mesh>
+    </group>
+  );
+}
+
 function helixCurve() {
   const pts: THREE.Vector3[] = [];
   for (let i = 0; i <= 400; i++) pts.push(helix(i / 400));
   return new THREE.CatmullRomCurve3(pts);
 }
 
-function Track() {
-  const geo = useMemo(() => new THREE.TubeGeometry(helixCurve(), 420, 0.62, 14, false), []);
-  const rail = useMemo(() => new THREE.TubeGeometry(helixCurve(), 420, 0.7, 3, false), []);
-  return (
-    <group>
-      <mesh geometry={geo}>
-        <meshStandardMaterial
-          color="#2a1d3d"
-          metalness={0.65}
-          roughness={0.28}
-          side={THREE.BackSide}
-        />
-      </mesh>
-      <mesh geometry={rail}>
-        <meshBasicMaterial color="#c46bff" wireframe transparent opacity={0.45} />
-      </mesh>
-    </group>
-  );
-}
 
 function Goal() {
   const ref = useRef<THREE.Mesh>(null);
