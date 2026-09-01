@@ -70,9 +70,12 @@ function Track() {
     <group>
       <mesh geometry={floor} receiveShadow>
         <meshStandardMaterial
-          color="#5a3f86"
-          metalness={0.35}
-          roughness={0.35}
+          color="#8f6fd0"
+          emissive="#3a1f66"
+          emissiveIntensity={0.8}
+          metalness={0.2}
+          roughness={0.5}
+          flatShading
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -197,9 +200,9 @@ export default function MarbleDrop3D({
       gl={{ antialias: true }}
     >
       <color attach="background" args={["#0b0716"]} />
-      <fog attach="fog" args={["#0b0716", 14, 32]} />
+      <fog attach="fog" args={["#0b0716", 18, 40]} />
       <ambientLight intensity={0.85} />
-      <directionalLight position={[6, 10, 6]} intensity={1.3} castShadow />
+      <directionalLight position={[6, 10, 6]} intensity={2.4} castShadow />
       <pointLight position={[-6, 2, -4]} color="#8a3ffb" intensity={30} distance={22} />
       <Environment>
         <Lightformer intensity={1.6} position={[0, 6, 0]} scale={[12, 12, 1]} />
