@@ -24,15 +24,15 @@ function helix(p: number, out = new THREE.Vector3()) {
   return out.set(Math.cos(a) * r, TOP_Y + (BOTTOM_Y - TOP_Y) * p, Math.sin(a) * r);
 }
 
-class HelixCurve extends THREE.Curve<THREE.Vector3> {
-  override getPoint(t: number, target = new THREE.Vector3()) {
-    return helix(t, target);
-  }
+function helixCurve() {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 400; i++) pts.push(helix(i / 400));
+  return new THREE.CatmullRomCurve3(pts);
 }
 
 function Track() {
-  const geo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(), 420, 0.62, 14, false), []);
-  const rail = useMemo(() => new THREE.TubeGeometry(new HelixCurve(), 420, 0.7, 3, false), []);
+  const geo = useMemo(() => new THREE.TubeGeometry(helixCurve(), 420, 0.62, 14, false), []);
+  const rail = useMemo(() => new THREE.TubeGeometry(helixCurve(), 420, 0.7, 3, false), []);
   return (
     <group>
       <mesh geometry={geo}>
