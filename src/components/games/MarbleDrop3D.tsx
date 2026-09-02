@@ -160,7 +160,7 @@ function Tornado() {
             refs.current[i] = m;
           }}
           position={[0, l.y, 0]}
-          material={mats[i]}
+          material={mats[i]!}
         >
           <cylinderGeometry args={[l.top, l.bottom, l.h, 96, 1, true]} />
         </mesh>
@@ -204,7 +204,7 @@ function Dust({ count = 2200 }: { count?: number }) {
     const dt = Math.min(delta, 0.05);
     const g = ref.current;
     if (!g) return;
-    const p = g.geometry.attributes.position as THREE.BufferAttribute;
+    const p = g.geometry.attributes["position"] as THREE.BufferAttribute;
     const arr = p.array as Float32Array;
     for (let i = 0; i < count; i++) {
       const base = i * 3;
