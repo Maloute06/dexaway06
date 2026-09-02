@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Html, Lightformer } from "@react-three/drei";
+import { Billboard, Environment, Html, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import { playerHue } from "@/lib/game-utils";
 
@@ -14,9 +14,9 @@ export interface Marble3DState {
 }
 
 const TURNS = 3.6;
-const TOP_Y = 4.4;
-const BOTTOM_Y = -3.6;
-const R0 = 3.5;
+const TOP_Y = 5.2;
+const BOTTOM_Y = -4.4;
+const R0 = 4.2;
 
 function helix(p: number, out = new THREE.Vector3()) {
   const a = p * Math.PI * 2 * TURNS;
@@ -24,9 +24,246 @@ function helix(p: number, out = new THREE.Vector3()) {
   return out.set(Math.cos(a) * r, TOP_Y + (BOTTOM_Y - TOP_Y) * p, Math.sin(a) * r);
 }
 
-/** Rampe hélicoïdale ouverte (ruban) + rebord extérieur : les billes restent visibles. */
+function helixCurve() {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 400; i++) pts.push(helix(i / 400));
+  return new THREE.CatmullRomCurve3(pts);
+}
+
+/* ------------------------------------------------------------------ textures */
+
+/** Nuage de poussière fibreux : sert de texture de paroi pour la tornade. */
+function makeVortexTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 512;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, 512, 512);
+  // stries verticales douces
+  for (let i = 0; i < 320; i++) {
+    const x = Math.random() * 512;
+    const w = 2 + Math.random() * 26;
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    const a = 0.05 + Math.random() * 0.4;
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.5, `rgba(255,255,255,${a})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    const y = Math.random() * 512;
+    const h = 60 + Math.random() * 452;
+    ctx.fillRect(x, y, w, h);
+  }
+  // grain
+  const img = ctx.getImageData(0, 0, 512, 512);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 42;
+    img.data[i] = Math.max(0, Math.min(255, img.data[i]! + n));
+    img.data[i + 1] = img.data[i]!;
+    img.data[i + 2] = img.data[i]!;
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Sol : terre craquelée + anneaux de vent. */
+function makeGroundTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 512;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#2b2436";
+  ctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 2600; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const s = Math.random() * 3.4;
+    ctx.fillStyle = `rgba(${120 + Math.random() * 70},${100 + Math.random() * 60},${150 + Math.random() * 70},${0.05 + Math.random() * 0.16})`;
+    ctx.fillRect(x, y, s, s);
+  }
+  ctx.strokeStyle = "rgba(20,14,30,0.55)";
+  for (let i = 0; i < 60; i++) {
+    ctx.beginPath();
+    ctx.lineWidth = 0.6 + Math.random();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let k = 0; k < 6; k++) {
+      x += (Math.random() - 0.5) * 90;
+      y += (Math.random() - 0.5) * 90;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 6);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* ------------------------------------------------------------------ tornade */
+
+function Tornado() {
+  const tex = useMemo(makeVortexTexture, []);
+  const layers = useMemo(
+    () => [
+      { top: 13, bottom: 1.5, h: 17, y: 3.2, op: 0.3, spin: 1.5, rep: [4, 2] as const, color: "#cbb7e8" },
+      { top: 10, bottom: 1.1, h: 16, y: 2.6, op: 0.36, spin: -2.1, rep: [6, 2] as const, color: "#e6d9ff" },
+      { top: 7.4, bottom: 0.8, h: 15, y: 2.2, op: 0.42, spin: 3.1, rep: [9, 3] as const, color: "#f3ecff" },
+      { top: 4.6, bottom: 0.5, h: 14, y: 1.9, op: 0.5, spin: -4.4, rep: [12, 3] as const, color: "#ffffff" },
+    ],
+    [],
+  );
+  const refs = useRef<(THREE.Mesh | null)[]>([]);
+  const mats = useMemo(
+    () =>
+      layers.map((l) => {
+        const t = tex.clone();
+        t.needsUpdate = true;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(l.rep[0], l.rep[1]);
+        return new THREE.MeshBasicMaterial({
+          map: t,
+          alphaMap: t,
+          color: new THREE.Color(l.color),
+          transparent: true,
+          opacity: l.op,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        });
+      }),
+    [layers, tex],
+  );
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    layers.forEach((l, i) => {
+      const m = refs.current[i];
+      if (m) m.rotation.y += l.spin * dt * 0.5;
+      const map = mats[i]!.map!;
+      map.offset.y -= dt * (0.35 + i * 0.22);
+      map.offset.x += dt * 0.06 * l.spin;
+    });
+  });
+
+  return (
+    <group>
+      {layers.map((l, i) => (
+        <mesh
+          key={i}
+          ref={(m) => {
+            refs.current[i] = m;
+          }}
+          position={[0, l.y, 0]}
+          material={mats[i]}
+        >
+          <cylinderGeometry args={[l.top, l.bottom, l.h, 96, 1, true]} />
+        </mesh>
+      ))}
+      {/* halo de débris au sol */}
+      <mesh position={[0, BOTTOM_Y - 1.3, 0]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[0.6, 7.5, 96]} />
+        <meshBasicMaterial
+          color="#b79ce6"
+          transparent
+          opacity={0.16}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/** Poussière et débris aspirés en spirale. */
+function Dust({ count = 2200 }: { count?: number }) {
+  const ref = useRef<THREE.Points>(null);
+  const data = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const seedArr = new Float32Array(count * 3); // radius, speed, phase
+    for (let i = 0; i < count; i++) {
+      const r = 0.8 + Math.pow(Math.random(), 0.6) * 11;
+      const phase = Math.random() * Math.PI * 2;
+      seedArr[i * 3] = r;
+      seedArr[i * 3 + 1] = 0.5 + Math.random() * 1.7;
+      seedArr[i * 3 + 2] = phase;
+      pos[i * 3] = Math.cos(phase) * r;
+      pos[i * 3 + 1] = -5 + Math.random() * 16;
+      pos[i * 3 + 2] = Math.sin(phase) * r;
+    }
+    return { pos, seedArr };
+  }, [count]);
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    const g = ref.current;
+    if (!g) return;
+    const p = g.geometry.attributes.position as THREE.BufferAttribute;
+    const arr = p.array as Float32Array;
+    for (let i = 0; i < count; i++) {
+      const base = i * 3;
+      const r0 = data.seedArr[base]!;
+      const spd = data.seedArr[base + 1]!;
+      let y = arr[base + 1]! + dt * spd * 2.4;
+      if (y > 11) y = -5;
+      arr[base + 1] = y;
+      // rayon décroissant vers le bas, rotation rapide
+      const h = (y + 5) / 16;
+      const r = 0.5 + r0 * (0.18 + h * 0.86);
+      const a = Math.atan2(arr[base + 2]!, arr[base]!) + dt * (2.6 / (0.4 + r * 0.22)) * spd;
+      arr[base] = Math.cos(a) * r;
+      arr[base + 2] = Math.sin(a) * r;
+    }
+    p.needsUpdate = true;
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[data.pos, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.07}
+        color="#e8dcff"
+        transparent
+        opacity={0.55}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+
+/* ------------------------------------------------------------------ décor */
+
+function Ground() {
+  const tex = useMemo(makeGroundTexture, []);
+  return (
+    <group position={[0, BOTTOM_Y - 1.35, 0]}>
+      <mesh rotation-x={-Math.PI / 2} receiveShadow>
+        <circleGeometry args={[46, 96]} />
+        <meshStandardMaterial map={tex} color="#6a5b86" roughness={0.95} metalness={0.05} />
+      </mesh>
+      {Array.from({ length: 5 }, (_, i) => (
+        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, 0.02 + i * 0.001, 0]}>
+          <ringGeometry args={[9 + i * 5, 9.25 + i * 5, 128]} />
+          <meshBasicMaterial color="#8f77c4" transparent opacity={0.14} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Rampe hélicoïdale ouverte (ruban) + rebord extérieur. */
 function ramp(width: number, wallHeight: number) {
-  const SEG = 420;
+  const SEG = 460;
   const floor: number[] = [];
   const wall: number[] = [];
   const a = new THREE.Vector3();
@@ -50,7 +287,6 @@ function ramp(width: number, wallHeight: number) {
     const [bi0, bi1, bi2, bo0, bo1, bo2] = quad(b, 0) as number[];
     floor.push(ai0!, ai1!, ai2!, ao0!, ao1!, ao2!, bo0!, bo1!, bo2!);
     floor.push(ai0!, ai1!, ai2!, bo0!, bo1!, bo2!, bi0!, bi1!, bi2!);
-    // rebord extérieur
     wall.push(ao0!, ao1!, ao2!, ao0!, ao1! + wallHeight, ao2!, bo0!, bo1! + wallHeight, bo2!);
     wall.push(ao0!, ao1!, ao2!, bo0!, bo1! + wallHeight, bo2!, bo0!, bo1!, bo2!);
   }
@@ -64,44 +300,38 @@ function ramp(width: number, wallHeight: number) {
 }
 
 function Track() {
-  const { floor, wall } = useMemo(() => ramp(1.5, 0.42), []);
-  const edge = useMemo(() => new THREE.TubeGeometry(helixCurve(), 420, 0.05, 6, false), []);
+  const { floor, wall } = useMemo(() => ramp(1.7, 0.5), []);
+  const edge = useMemo(() => new THREE.TubeGeometry(helixCurve(), 460, 0.055, 6, false), []);
   return (
     <group>
-      <mesh geometry={floor} receiveShadow>
+      <mesh geometry={floor} receiveShadow castShadow>
         <meshStandardMaterial
-          color="#7b5ccf"
-          emissive="#3a1f66"
-          emissiveIntensity={0.8}
-          metalness={0.2}
-          roughness={0.5}
-          flatShading
+          color="#3b3350"
+          emissive="#1a1030"
+          emissiveIntensity={0.4}
+          metalness={0.65}
+          roughness={0.35}
           side={THREE.DoubleSide}
         />
       </mesh>
       <mesh geometry={wall}>
         <meshStandardMaterial
-          color="#8a4dd6"
-          emissive="#b06bff"
-          emissiveIntensity={0.6}
+          color="#7b45c8"
+          emissive="#a865ff"
+          emissiveIntensity={1.1}
+          metalness={0.4}
+          roughness={0.3}
           transparent
-          opacity={0.55}
+          opacity={0.5}
           side={THREE.DoubleSide}
         />
       </mesh>
       <mesh geometry={edge}>
-        <meshBasicMaterial color="#e6b3ff" />
+        <meshBasicMaterial color="#f0d6ff" />
       </mesh>
     </group>
   );
 }
-
-function helixCurve() {
-  const pts: THREE.Vector3[] = [];
-  for (let i = 0; i <= 400; i++) pts.push(helix(i / 400));
-  return new THREE.CatmullRomCurve3(pts);
-}
-
 
 function Goal() {
   const ref = useRef<THREE.Mesh>(null);
@@ -110,67 +340,81 @@ function Goal() {
     ref.current?.scale.set(s, s, s);
   });
   return (
-    <group position={[0, BOTTOM_Y - 0.9, 0]}>
+    <group position={[0, BOTTOM_Y - 0.95, 0]}>
       <mesh ref={ref}>
-        <sphereGeometry args={[0.75, 32, 32]} />
+        <sphereGeometry args={[0.8, 40, 40]} />
         <meshStandardMaterial
           color="#ffd15c"
           emissive="#ffb400"
-          emissiveIntensity={2.4}
-          roughness={0.2}
+          emissiveIntensity={2.6}
+          roughness={0.15}
+          metalness={0.5}
         />
       </mesh>
-      <pointLight color="#ffc95c" intensity={22} distance={9} />
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.75, 0]}>
-        <ringGeometry args={[0.9, 2.6, 64]} />
-        <meshBasicMaterial color="#ffc95c" transparent opacity={0.22} side={THREE.DoubleSide} />
-      </mesh>
+      <pointLight color="#ffc95c" intensity={28} distance={12} />
     </group>
   );
 }
 
-function Marble({ state, leader }: { state: Marble3DState; leader: boolean }) {
+/* ------------------------------------------------------------------ billes */
+
+function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
   const ref = useRef<THREE.Group>(null);
-  const color = useMemo(
-    () => new THREE.Color().setHSL(playerHue(state.name) / 360, 0.85, 0.62),
-    [state.name],
-  );
+  const hue = playerHue(state.name);
+  const color = useMemo(() => new THREE.Color().setHSL(hue / 360, 0.85, 0.6), [hue]);
   const vec = useMemo(() => new THREE.Vector3(), []);
+  const lead = rank === 1;
 
   useFrame(({ clock }) => {
     const g = ref.current;
     if (!g) return;
     helix(Math.min(state.p, 1), vec);
-    const wobble = Math.sin(clock.elapsedTime * 6 + playerHue(state.name)) * 0.22;
+    const wobble = Math.sin(clock.elapsedTime * 6 + hue) * 0.22;
     if (state.dead) {
       const d = state.deadFor;
-      const push = 1 + d * 5;
-      g.position.set(vec.x * push, vec.y + d * 2 - d * d * 6.5, vec.z * push);
+      // aspirée par la tornade : spirale ascendante
+      const a = clock.elapsedTime * 4 + hue;
+      const r = Math.max(0.4, 3.6 - d * 0.8);
+      g.position.set(Math.cos(a) * r, vec.y + d * 3.4, Math.sin(a) * r);
+      g.scale.setScalar(Math.max(0.001, 1 - d * 0.12));
     } else {
-      g.position.set(vec.x + wobble * 0.32, vec.y + 0.3 + wobble * 0.05, vec.z + wobble * 0.32);
+      g.position.set(vec.x + wobble * 0.3, vec.y + 0.34 + wobble * 0.05, vec.z + wobble * 0.3);
     }
-    g.rotation.x += 0.14;
-    g.rotation.y += 0.09;
+    g.rotation.x += 0.16;
+    g.rotation.y += 0.1;
   });
+
+  const r = lead ? 0.34 : 0.28;
 
   return (
     <group ref={ref}>
       <mesh castShadow>
-        <sphereGeometry args={[leader ? 0.3 : 0.24, 24, 24]} />
+        <sphereGeometry args={[r, 32, 32]} />
         <meshStandardMaterial
           color={state.dead ? "#4b4b55" : color}
           emissive={state.dead ? "#000000" : color}
-          emissiveIntensity={state.dead ? 0 : leader ? 2.2 : 1.35}
-          metalness={0.4}
-          roughness={0.12}
+          emissiveIntensity={state.dead ? 0 : lead ? 1.6 : 0.9}
+          metalness={0.85}
+          roughness={0.08}
         />
       </mesh>
-      {leader && !state.dead && (
-        <Html center distanceFactor={9} zIndexRange={[10, 0]}>
-          <span className="whitespace-nowrap rounded-full border border-gold/60 bg-background/80 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-gold backdrop-blur">
-            {state.name}
-          </span>
-        </Html>
+      {!state.dead && (
+        <Billboard position={[0, r + 0.42, 0]}>
+          <Html center distanceFactor={11} zIndexRange={[20, 0]}>
+            <span
+              className="pointer-events-none flex select-none items-center gap-1 whitespace-nowrap rounded-full px-2 py-[2px] font-mono text-[11px] font-semibold tracking-wide backdrop-blur-sm"
+              style={{
+                background: "oklch(0.16 0.02 300 / 78%)",
+                border: `1px solid oklch(0.75 0.12 ${hue} / 70%)`,
+                color: `oklch(0.92 0.09 ${hue})`,
+                boxShadow: lead ? "0 0 14px oklch(0.85 0.16 95 / 60%)" : undefined,
+              }}
+            >
+              {lead && <span>👑</span>}
+              {state.name}
+            </span>
+          </Html>
+        </Billboard>
       )}
     </group>
   );
@@ -178,48 +422,59 @@ function Marble({ state, leader }: { state: Marble3DState; leader: boolean }) {
 
 function Rig() {
   useFrame(({ camera, clock }) => {
-    const t = clock.elapsedTime * 0.16;
-    camera.position.set(Math.sin(t) * 11.5, 3.6 + Math.sin(t * 0.7) * 1.2, Math.cos(t) * 11.5);
-    camera.lookAt(0, 0.2, 0);
+    const t = clock.elapsedTime * 0.13;
+    const d = 15 + Math.sin(t * 0.9) * 2.2;
+    camera.position.set(Math.sin(t) * d, 4.2 + Math.sin(t * 0.6) * 2.4, Math.cos(t) * d);
+    camera.lookAt(0, 0.4, 0);
   });
   return null;
 }
 
 export default function MarbleDrop3D({
   marbles,
-  leader,
+  ranks,
 }: {
   marbles: Marble3DState[];
-  leader?: string | undefined;
+  /** nom → rang temps réel (1 = leader) */
+  ranks: Record<string, number>;
 }) {
   return (
     <Canvas
-      flat
       shadows
       dpr={[1, 1.75]}
-      camera={{ position: [0, 4, 12], fov: 52 }}
+      camera={{ position: [0, 5, 16], fov: 50 }}
       gl={{ antialias: true }}
     >
-      <color attach="background" args={["#0b0716"]} />
-      <fog attach="fog" args={["#0b0716", 18, 40]} />
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[6, 10, 6]} intensity={2.4} castShadow />
-      <pointLight position={[-6, 2, -4]} color="#8a3ffb" intensity={30} distance={22} />
+      <color attach="background" args={["#0a0714"]} />
+      <fog attach="fog" args={["#150c26", 22, 62]} />
+      <ambientLight intensity={0.5} />
+      <hemisphereLight args={["#b79ce6", "#241a33", 0.7]} />
+      <directionalLight
+        position={[10, 16, 8]}
+        intensity={2.2}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+      />
+      <pointLight position={[-8, 3, -6]} color="#8a3ffb" intensity={40} distance={30} />
       <Environment>
-        <Lightformer intensity={1.6} position={[0, 6, 0]} scale={[12, 12, 1]} />
+        <Lightformer intensity={2} position={[0, 9, 0]} scale={[16, 16, 1]} />
         <Lightformer
-          intensity={1}
+          intensity={1.1}
           color="#b06bff"
-          position={[-6, 1, -2]}
+          position={[-8, 2, -3]}
           rotation-y={Math.PI / 2}
-          scale={[18, 3, 1]}
+          scale={[22, 4, 1]}
         />
       </Environment>
       <Rig />
+      <Ground />
+      <Tornado />
+      <Dust />
       <Track />
       <Goal />
       {marbles.map((m) => (
-        <Marble key={m.name} state={m} leader={m.name === leader} />
+        <Marble key={m.name} state={m} rank={ranks[m.name] ?? 99} />
       ))}
     </Canvas>
   );
