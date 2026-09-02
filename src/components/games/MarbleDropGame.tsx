@@ -34,7 +34,7 @@ export function MarbleDropGame({ players, seed, onFinish }: MiniGameProps) {
       .sort((a, b) => a.ejectAt - b.ejectAt)
       .map((m) => m.name);
     const ranking = lastStandingRanking(finishers, ejected);
-    return { marbles, duration, ranking, visual: takeVisual(marbles, 80) };
+    return { marbles, duration, ranking, visual: takeVisual(marbles, 60) };
   }, [players, seed]);
 
   const t = useClock();
@@ -58,24 +58,35 @@ export function MarbleDropGame({ players, seed, onFinish }: MiniGameProps) {
     };
   });
 
-  const leader = states
-    .filter((s) => !s.dead)
-    .reduce<Marble3DState | null>((best, s) => (!best || s.p > best.p ? s : best), null);
+  // Classement temps réel : vivants d'abord (progression décroissante), puis éjectés.
+  const live = useMemo(() => {
+    const alive = states.filter((s) => !s.dead).sort((a, b) => b.p - a.p);
+    const gone = states.filter((s) => s.dead).sort((a, b) => b.p - a.p);
+    return [...alive, ...gone];
+  }, [states]);
+
+  const ranks = useMemo(() => {
+    const r: Record<string, number> = {};
+    live.forEach((s, i) => (r[s.name] = i + 1));
+    return r;
+  }, [live]);
+
+  const remaining = Math.max(0, Math.ceil(sim.duration - t));
 
   return (
     <GameStage
+      full
       image={imgMarbleDrop}
       title="Marble Drop"
-      subtitle="Descente 3D en spirale · pièges & accélérateurs"
-      aspect="video"
-      minHeight={460}
+      subtitle="Arène tornade 3D · pièges & accélérateurs"
+      aspect="auto"
       status={
         <>
           <Hud tone="live">{players.length - out} billes</Hud>
-          <Hud tone="danger">{out} éjectées</Hud>
+          <Hud tone="danger">{out} aspirées</Hud>
+          <Hud tone="gold">{remaining}s</Hud>
         </>
       }
-      caption="Les billes dévalent la spirale en 3D. Celles qui décrochent sont éjectées dans le vide — le cœur doré, tout en bas, est l'arrivée."
     >
       {mounted && (
         <Suspense
@@ -86,10 +97,41 @@ export function MarbleDropGame({ players, seed, onFinish }: MiniGameProps) {
           }
         >
           <div className="absolute inset-0">
-            <MarbleDrop3D marbles={states} leader={leader?.name} />
+            <MarbleDrop3D marbles={states} ranks={ranks} />
           </div>
         </Suspense>
       )}
+
+      {/* Classement temps réel */}
+      <div className="pointer-events-none absolute right-3 top-3 z-30 w-52 rounded-xl border border-border/70 bg-background/70 p-3 backdrop-blur-md sm:w-60">
+        <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          <span>Classement live</span>
+          <span>{live.length}</span>
+        </div>
+        <ol className="space-y-1">
+          {live.slice(0, 10).map((s, i) => (
+            <li
+              key={s.name}
+              className="flex items-center gap-2 rounded-md px-1.5 py-1 font-mono text-[11px]"
+              style={{
+                background: i === 0 ? "oklch(0.72 0.14 95 / 14%)" : "oklch(1 0 0 / 4%)",
+                opacity: s.dead ? 0.4 : 1,
+              }}
+            >
+              <span
+                className="w-4 shrink-0 text-right font-semibold"
+                style={{ color: i === 0 ? "var(--color-gold)" : "var(--color-muted-foreground)" }}
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{s.name}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {s.dead ? "✕" : `${Math.round(s.p * 100)}%`}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </GameStage>
   );
 }
