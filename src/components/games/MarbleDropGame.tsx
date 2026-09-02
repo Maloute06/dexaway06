@@ -103,7 +103,7 @@ export function MarbleDropGame({ players, seed, onFinish }: MiniGameProps) {
       )}
 
       {/* Classement temps réel */}
-      <div className="pointer-events-none absolute left-3 top-3 z-30 w-52 rounded-xl border border-border/70 bg-background/70 p-3 backdrop-blur-md sm:w-60">
+      <div className="pointer-events-none absolute right-3 top-3 z-30 w-52 rounded-xl border border-border/70 bg-background/70 p-3 backdrop-blur-md sm:w-60">
         <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
           <span>Classement live</span>
           <span>{live.length}</span>
