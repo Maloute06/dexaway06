@@ -26,6 +26,7 @@ export function GameStage({
   overlay,
   caption,
   shake = false,
+  full = false,
 }: {
   image: string;
   title: string;
@@ -37,9 +38,15 @@ export function GameStage({
   overlay?: ReactNode;
   caption?: ReactNode;
   shake?: boolean;
+  /** Scène immersive : pleine largeur d'écran et hauteur quasi plein écran. */
+  full?: boolean;
 }) {
   return (
-    <div className="panel relative overflow-hidden p-0">
+    <div
+      className={`panel relative overflow-hidden p-0 ${
+        full ? "left-1/2 w-screen max-w-none -translate-x-1/2 rounded-none border-x-0" : ""
+      }`}
+    >
       <div className="pointer-events-none absolute inset-0">
         <img
           src={image}
@@ -74,7 +81,13 @@ export function GameStage({
           className={`relative overflow-hidden rounded-xl border border-border/70 bg-background/45 ${ASPECT[aspect]} ${
             shake ? "animate-shake" : ""
           }`}
-          style={minHeight ? { minHeight } : undefined}
+          style={
+            full
+              ? { height: "min(86vh, calc(100vh - 150px))", minHeight: 460 }
+              : minHeight
+                ? { minHeight }
+                : undefined
+          }
         >
           <div className="pointer-events-none absolute inset-0 fx-vignette z-20" />
           {children}
