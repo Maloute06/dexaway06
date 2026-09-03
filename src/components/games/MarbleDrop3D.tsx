@@ -398,21 +398,8 @@ function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
           roughness={0.08}
         />
       </mesh>
-      {!state.dead && (
-        <Billboard position={[0, r + 0.5, 0]}>
-          <Text
-            fontSize={0.3}
-            anchorX="center"
-            anchorY="middle"
-            color={lead ? "#ffe08a" : "#ffffff"}
-            outlineWidth={0.045}
-            outlineColor="#0a0612"
-            outlineOpacity={0.95}
-          >
-            {lead ? `★ ${state.name}` : state.name}
-          </Text>
-        </Billboard>
-      )}
+      {!state.dead && <NameTag name={state.name} lead={lead} y={r + 0.55} hue={hue} />}
+
 
     </group>
   );
