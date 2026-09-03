@@ -391,7 +391,7 @@ function NameTag({ name, lead, y, hue }: { name: string; lead: boolean; y: numbe
   }, [name, lead, hue]);
 
   const aspect = texture.image.width / texture.image.height;
-  const height = 0.3;
+  const height = 0.16;
 
   return (
     <sprite position={[0, y, 0]} scale={[height * aspect, height, 1]}>
@@ -442,7 +442,7 @@ function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
           roughness={0.08}
         />
       </mesh>
-      {!state.dead && <NameTag name={state.name} lead={lead} y={r + 0.55} hue={hue} />}
+      {!state.dead && <NameTag name={state.name} lead={lead} y={r + 0.34} hue={hue} />}
 
 
     </group>
