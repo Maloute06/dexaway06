@@ -358,6 +358,50 @@ function Goal() {
 
 /* ------------------------------------------------------------------ billes */
 
+/** Pseudo affiché au-dessus de la bille, dessiné dans un canvas 2D (aucune police réseau). */
+function NameTag({ name, lead, y, hue }: { name: string; lead: boolean; y: number; hue: number }) {
+  const texture = useMemo(() => {
+    const label = lead ? `★ ${name}` : name;
+    const scale = 3;
+    const font = `bold ${22 * scale}px ui-monospace, Menlo, monospace`;
+    const probe = document.createElement("canvas").getContext("2d")!;
+    probe.font = font;
+    const w = Math.ceil(probe.measureText(label).width) + 26 * scale;
+    const h = 38 * scale;
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext("2d")!;
+    const rad = 14 * scale;
+    ctx.beginPath();
+    ctx.roundRect(scale, scale, w - 2 * scale, h - 2 * scale, rad);
+    ctx.fillStyle = "rgba(12,8,22,0.78)";
+    ctx.fill();
+    ctx.lineWidth = 2 * scale;
+    ctx.strokeStyle = lead ? "rgba(255,214,120,0.95)" : `hsla(${hue}, 85%, 72%, 0.8)`;
+    ctx.stroke();
+    ctx.font = font;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = lead ? "#ffe6a3" : "#ffffff";
+    ctx.fillText(label, w / 2, h / 2 + scale);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.anisotropy = 4;
+    return tex;
+  }, [name, lead, hue]);
+
+  const aspect = texture.image.width / texture.image.height;
+  const height = 0.3;
+
+  return (
+    <sprite position={[0, y, 0]} scale={[height * aspect, height, 1]}>
+      <spriteMaterial map={texture} transparent depthTest={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
+
+
 function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
   const ref = useRef<THREE.Group>(null);
   const hue = playerHue(state.name);
