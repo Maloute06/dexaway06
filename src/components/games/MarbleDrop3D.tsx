@@ -399,23 +399,21 @@ function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
         />
       </mesh>
       {!state.dead && (
-        <Billboard position={[0, r + 0.42, 0]}>
-          <Html center distanceFactor={11} zIndexRange={[20, 0]}>
-            <span
-              className="pointer-events-none flex select-none items-center gap-1 whitespace-nowrap rounded-full px-2 py-[2px] font-mono text-[11px] font-semibold tracking-wide backdrop-blur-sm"
-              style={{
-                background: "oklch(0.16 0.02 300 / 78%)",
-                border: `1px solid oklch(0.75 0.12 ${hue} / 70%)`,
-                color: `oklch(0.92 0.09 ${hue})`,
-                boxShadow: lead ? "0 0 14px oklch(0.85 0.16 95 / 60%)" : undefined,
-              }}
-            >
-              {lead && <span>👑</span>}
-              {state.name}
-            </span>
-          </Html>
+        <Billboard position={[0, r + 0.5, 0]}>
+          <Text
+            fontSize={0.3}
+            anchorX="center"
+            anchorY="middle"
+            color={lead ? "#ffe08a" : "#ffffff"}
+            outlineWidth={0.045}
+            outlineColor="#0a0612"
+            outlineOpacity={0.95}
+          >
+            {lead ? `★ ${state.name}` : state.name}
+          </Text>
         </Billboard>
       )}
+
     </group>
   );
 }
