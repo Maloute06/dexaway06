@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Billboard, Environment, Html, Lightformer } from "@react-three/drei";
+import { Environment, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import { playerHue } from "@/lib/game-utils";
 
@@ -358,6 +358,50 @@ function Goal() {
 
 /* ------------------------------------------------------------------ billes */
 
+/** Pseudo affiché au-dessus de la bille, dessiné dans un canvas 2D (aucune police réseau). */
+function NameTag({ name, lead, y, hue }: { name: string; lead: boolean; y: number; hue: number }) {
+  const texture = useMemo(() => {
+    const label = lead ? `★ ${name}` : name;
+    const scale = 3;
+    const font = `bold ${22 * scale}px ui-monospace, Menlo, monospace`;
+    const probe = document.createElement("canvas").getContext("2d")!;
+    probe.font = font;
+    const w = Math.ceil(probe.measureText(label).width) + 26 * scale;
+    const h = 38 * scale;
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext("2d")!;
+    const rad = 14 * scale;
+    ctx.beginPath();
+    ctx.roundRect(scale, scale, w - 2 * scale, h - 2 * scale, rad);
+    ctx.fillStyle = "rgba(12,8,22,0.78)";
+    ctx.fill();
+    ctx.lineWidth = 2 * scale;
+    ctx.strokeStyle = lead ? "rgba(255,214,120,0.95)" : `hsla(${hue}, 85%, 72%, 0.8)`;
+    ctx.stroke();
+    ctx.font = font;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = lead ? "#ffe6a3" : "#ffffff";
+    ctx.fillText(label, w / 2, h / 2 + scale);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.anisotropy = 4;
+    return tex;
+  }, [name, lead, hue]);
+
+  const aspect = texture.image.width / texture.image.height;
+  const height = 0.16;
+
+  return (
+    <sprite position={[0, y, 0]} scale={[height * aspect, height, 1]}>
+      <spriteMaterial map={texture} transparent depthTest={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
+
+
 function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
   const ref = useRef<THREE.Group>(null);
   const hue = playerHue(state.name);
@@ -398,24 +442,9 @@ function Marble({ state, rank }: { state: Marble3DState; rank: number }) {
           roughness={0.08}
         />
       </mesh>
-      {!state.dead && (
-        <Billboard position={[0, r + 0.42, 0]}>
-          <Html center distanceFactor={11} zIndexRange={[20, 0]}>
-            <span
-              className="pointer-events-none flex select-none items-center gap-1 whitespace-nowrap rounded-full px-2 py-[2px] font-mono text-[11px] font-semibold tracking-wide backdrop-blur-sm"
-              style={{
-                background: "oklch(0.16 0.02 300 / 78%)",
-                border: `1px solid oklch(0.75 0.12 ${hue} / 70%)`,
-                color: `oklch(0.92 0.09 ${hue})`,
-                boxShadow: lead ? "0 0 14px oklch(0.85 0.16 95 / 60%)" : undefined,
-              }}
-            >
-              {lead && <span>👑</span>}
-              {state.name}
-            </span>
-          </Html>
-        </Billboard>
-      )}
+      {!state.dead && <NameTag name={state.name} lead={lead} y={r + 0.34} hue={hue} />}
+
+
     </group>
   );
 }
