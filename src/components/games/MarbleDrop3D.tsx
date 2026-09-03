@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Billboard, Environment, Html, Lightformer } from "@react-three/drei";
+import { Billboard, Environment, Html, Lightformer, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { playerHue } from "@/lib/game-utils";
 
